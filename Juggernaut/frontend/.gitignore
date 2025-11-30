@@ -22,7 +22,8 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
-backend/config/serviceAccountKey.json
 .env
 .env.local
 firebase.js
+backend/config/serviceAccountKey.json
+ai_engine/.env
