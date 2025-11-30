@@ -5,7 +5,7 @@ import { translations } from '../translations';
 
 export const LandingPage = ({ onEnter, language, setLanguage }) => {
   const t = translations[language];
-  const lt = t.landing; // Access landing page specific translations
+  const lt = t.landing; 
 
   return (
     <div className="min-h-screen bg-slate-900 text-white flex flex-col relative overflow-y-auto font-sans">

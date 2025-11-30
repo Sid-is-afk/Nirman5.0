@@ -107,7 +107,7 @@ export const LandingPage = ({ onEnter, language, setLanguage }) => {
                       <Stethoscope size={24} />
                     </div>
                     <div>
-                      <h3 className="font-bold text-lg">{lt.diagnosisFlowTitle}</h3>
+                      <h3 className="font-bold text-xl">{lt.diagnosisFlowTitle}</h3>
                       <p className="text-slate-400 text-sm">{lt.diagnosisFlowSub}</p>
                     </div>
                  </div>
@@ -115,18 +115,18 @@ export const LandingPage = ({ onEnter, language, setLanguage }) => {
                  <div className="space-y-0 pl-4 border-l border-white/10 ml-5">
                     <div className="relative pl-8 pb-8">
                        <div className="absolute -left-[5px] top-1 w-2.5 h-2.5 rounded-full bg-slate-600 ring-4 ring-slate-900"></div>
-                       <h4 className="font-bold text-white text-sm mb-1">{lt.dfStep1Title}</h4>
-                       <p className="text-slate-400 text-xs leading-relaxed">{lt.dfStep1Desc}</p>
+                       <h4 className="font-bold text-white text-lg mb-1">{lt.dfStep1Title}</h4>
+                       <p className="text-slate-400 text-sm leading-relaxed">{lt.dfStep1Desc}</p>
                     </div>
                     <div className="relative pl-8 pb-8">
                        <div className="absolute -left-[5px] top-1 w-2.5 h-2.5 rounded-full bg-blue-500 ring-4 ring-slate-900"></div>
-                       <h4 className="font-bold text-white text-sm mb-1">{lt.dfStep2Title}</h4>
-                       <p className="text-slate-400 text-xs leading-relaxed">{lt.dfStep2Desc}</p>
+                       <h4 className="font-bold text-white text-lg mb-1">{lt.dfStep2Title}</h4>
+                       <p className="text-slate-400 text-sm leading-relaxed">{lt.dfStep2Desc}</p>
                     </div>
                     <div className="relative pl-8">
                        <div className="absolute -left-[5px] top-1 w-2.5 h-2.5 rounded-full bg-lime-400 ring-4 ring-slate-900"></div>
-                       <h4 className="font-bold text-white text-sm mb-1">{lt.dfStep3Title}</h4>
-                       <p className="text-slate-400 text-xs leading-relaxed">{lt.dfStep3Desc}</p>
+                       <h4 className="font-bold text-white text-lg mb-1">{lt.dfStep3Title}</h4>
+                       <p className="text-slate-400 text-sm leading-relaxed">{lt.dfStep3Desc}</p>
                     </div>
                  </div>
              </div>
@@ -138,7 +138,7 @@ export const LandingPage = ({ onEnter, language, setLanguage }) => {
                       <Map size={24} />
                     </div>
                     <div>
-                      <h3 className="font-bold text-lg">{lt.communityFlowTitle}</h3>
+                      <h3 className="font-bold text-xl">{lt.communityFlowTitle}</h3>
                       <p className="text-slate-400 text-sm">{lt.communityFlowSub}</p>
                     </div>
                  </div>
@@ -146,18 +146,18 @@ export const LandingPage = ({ onEnter, language, setLanguage }) => {
                  <div className="space-y-0 pl-4 border-l border-white/10 ml-5">
                     <div className="relative pl-8 pb-8">
                        <div className="absolute -left-[5px] top-1 w-2.5 h-2.5 rounded-full bg-slate-600 ring-4 ring-slate-900"></div>
-                       <h4 className="font-bold text-white text-sm mb-1">{lt.cfStep1Title}</h4>
-                       <p className="text-slate-400 text-xs leading-relaxed">{lt.cfStep1Desc}</p>
+                       <h4 className="font-bold text-white text-lg mb-1">{lt.cfStep1Title}</h4>
+                       <p className="text-slate-400 text-sm leading-relaxed">{lt.cfStep1Desc}</p>
                     </div>
                     <div className="relative pl-8 pb-8">
                        <div className="absolute -left-[5px] top-1 w-2.5 h-2.5 rounded-full bg-blue-500 ring-4 ring-slate-900"></div>
-                       <h4 className="font-bold text-white text-sm mb-1">{lt.cfStep2Title}</h4>
-                       <p className="text-slate-400 text-xs leading-relaxed">{lt.cfStep2Desc}</p>
+                       <h4 className="font-bold text-white text-lg mb-1">{lt.cfStep2Title}</h4>
+                       <p className="text-slate-400 text-sm leading-relaxed">{lt.cfStep2Desc}</p>
                     </div>
                     <div className="relative pl-8">
                        <div className="absolute -left-[5px] top-1 w-2.5 h-2.5 rounded-full bg-lime-400 ring-4 ring-slate-900"></div>
-                       <h4 className="font-bold text-white text-sm mb-1">{lt.cfStep3Title}</h4>
-                       <p className="text-slate-400 text-xs leading-relaxed">{lt.cfStep3Desc}</p>
+                       <h4 className="font-bold text-white text-lg mb-1">{lt.cfStep3Title}</h4>
+                       <p className="text-slate-400 text-sm leading-relaxed">{lt.cfStep3Desc}</p>
                     </div>
                  </div>
              </div>

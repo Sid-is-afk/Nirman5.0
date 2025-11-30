@@ -1,20 +1,22 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { GoogleGenAI } from "@google/genai";
+// 👇 CHANGED: Import the official stable SDK
+import { GoogleGenerativeAI } from "@google/generative-ai";
 import { MessageCircle, X, Send, Loader2, Bot, User as UserIcon, Sparkles } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { translations } from '../translations'; // Assuming you might need translations later, kept import style
+// import { translations } from '../translations'; 
 
 export const ChatBot = ({ language }) => {
-  // NOTE: Keeping the default state as 'false' so it appears as a floating button
   const [isOpen, setIsOpen] = useState(false); 
   const [messages, setMessages] = useState([
     { id: 'welcome', role: 'model', text: 'Hello! I am your Agri-Sentry AI assistant. How can I help you with your crops today?' }
   ]);
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  
   const messagesEndRef = useRef(null);
   const chatSessionRef = useRef(null);
 
+  // 👇 SCROLL LOGIC
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
@@ -23,29 +25,56 @@ export const ChatBot = ({ language }) => {
     scrollToBottom();
   }, [messages, isOpen]);
 
-  const initializeChat = () => {
+  // 👇 GEMINI INITIALIZATION LOGIC
+  const initializeChat = async () => {
     if (!chatSessionRef.current) {
-      // NOTE: Using a placeholder for API_KEY access, ensure this is handled correctly in your environment (.env.local)
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-      chatSessionRef.current = ai.chats.create({
-        model: 'gemini-3-pro-preview',
-        config: {
-          systemInstruction: `You are an expert agricultural AI assistant for the Agri-Sentry platform. Current user language is ${language}. You are helpful, concise, and knowledgeable about farming, crop diseases, supply verification, and weather patterns. Keep responses professional yet friendly.`,
-        },
-      });
+      try {
+        // Access key based on your build tool (Create React App uses process.env, Vite uses import.meta.env)
+        const API_KEY = process.env.REACT_APP_GEMINI_API_KEY || "YOUR_FALLBACK_KEY"; 
+        
+        const genAI = new GoogleGenerativeAI(API_KEY);
+        
+        // Use a fast, cost-effective model like gemini-1.5-flash
+        const model = genAI.getGenerativeModel({ 
+          model: "gemini-1.5-flash",
+          systemInstruction: `You are an expert agricultural AI assistant for the Agri-Sentry platform. 
+          Current user language is ${language}. 
+          You are helpful, concise, and knowledgeable about farming, crop diseases, supply verification, and weather patterns. 
+          Keep responses professional yet friendly. Do not use markdown formatting like **bold** too often, keep it plain text friendly.`
+        });
+
+        // Start the chat session
+        chatSessionRef.current = model.startChat({
+          history: [
+            {
+              role: "user",
+              parts: [{ text: "Hello" }],
+            },
+            {
+              role: "model",
+              parts: [{ text: "Hello! I am your Agri-Sentry AI assistant. How can I help you with your crops today?" }],
+            },
+          ],
+        });
+        
+      } catch (error) {
+        console.error("Error initializing Gemini:", error);
+      }
     }
   };
 
+  // Initialize when chat opens
   useEffect(() => {
     if (isOpen) {
-      chatSessionRef.current = null;
       initializeChat();
     }
   }, [isOpen, language]);
 
+  // 👇 SEND MESSAGE LOGIC
   const handleSend = async () => {
     if (!inputValue.trim() || isLoading) return;
 
+    // 1. Add User Message to UI
     const userMessage = {
       id: Date.now().toString(),
       role: 'user',
@@ -57,18 +86,22 @@ export const ChatBot = ({ language }) => {
     setIsLoading(true);
 
     try {
+      // Ensure chat is initialized
       if (!chatSessionRef.current) {
-         initializeChat();
+         await initializeChat();
       }
       
       if (chatSessionRef.current) {
-        const result = await chatSessionRef.current.sendMessage({ message: userMessage.text });
-        const text = result.text;
+        // 2. Send to Gemini
+        const result = await chatSessionRef.current.sendMessage(userMessage.text);
+        const response = await result.response;
+        const text = response.text();
         
+        // 3. Add Model Response to UI
         setMessages(prev => [...prev, {
           id: (Date.now() + 1).toString(),
           role: 'model',
-          text: text || "I didn't get a response."
+          text: text
         }]);
       }
     } catch (error) {
@@ -76,7 +109,7 @@ export const ChatBot = ({ language }) => {
       setMessages(prev => [...prev, {
         id: (Date.now() + 1).toString(),
         role: 'model',
-        text: "I'm sorry, I'm having trouble connecting to the satellite network right now. Please try again later."
+        text: "I'm having trouble connecting to the network. Please check your internet or API Key."
       }]);
     } finally {
       setIsLoading(false);
@@ -90,20 +123,17 @@ export const ChatBot = ({ language }) => {
     }
   };
 
-  // Calculate the offset needed to clear the bottom navigation bar (if it's 60px tall)
-  // We'll use a larger bottom margin for the button to lift it above the nav bar.
-  const bottomOffsetClass = 'bottom-[75px]'; // 75px should place it nicely above the bottom nav
+  const bottomOffsetClass = 'bottom-[75px]'; 
 
   return (
     <>
-      {/* Floating Toggle Button - POSITIONED IN THE BOTTOM-RIGHT CORNER */}
+      {/* Floating Toggle Button */}
       <motion.button
         initial={{ scale: 0 }}
         animate={{ scale: 1 }}
         whileHover={{ scale: 1.1 }}
         whileTap={{ scale: 0.9 }}
         onClick={() => setIsOpen(true)}
-        // POSITION ADJUSTMENT: Using right-4 and a custom bottom offset to clear the bottom navigation bar.
         className={`fixed ${bottomOffsetClass} right-4 md:bottom-6 md:right-6 z-50 p-3 md:p-4 rounded-full shadow-[0_0_30px_rgba(163,230,53,0.3)] transition-all duration-300 ${
           isOpen ? 'scale-0 opacity-0 pointer-events-none' : 'bg-lime-400 text-emerald-950 hover:bg-lime-300'
         }`}
@@ -111,18 +141,17 @@ export const ChatBot = ({ language }) => {
         <MessageCircle size={28} className='md:size-8' strokeWidth={2.5} />
       </motion.button>
 
-      {/* Chat Window - POSITIONED IN THE BOTTOM-RIGHT CORNER */}
+      {/* Chat Window */}
       <AnimatePresence>
         {isOpen && (
           <motion.div
             initial={{ opacity: 0, y: 20, scale: 0.95 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 20, scale: 0.95 }}
-            // POSITION ADJUSTMENT: Fullscreen on mobile, floating in the bottom-right on desktop.
             className={`fixed inset-0 md:inset-auto md:bottom-6 md:right-6 
                         w-full h-full max-h-none 
                         md:w-[400px] md:h-[600px] md:max-h-[80vh] 
-                        bg-slate-900/90 backdrop-blur-2xl rounded-none md:rounded-[2rem] shadow-2xl 
+                        bg-slate-900/95 backdrop-blur-2xl rounded-none md:rounded-[2rem] shadow-2xl 
                         flex flex-col overflow-hidden z-50 border border-white/10 font-sans`}
           >
             {/* Header */}
@@ -137,7 +166,7 @@ export const ChatBot = ({ language }) => {
                   <h3 className="font-bold text-lg leading-tight text-white">Agri-Sentry AI</h3>
                   <p className="text-[10px] text-emerald-200/70 flex items-center gap-1 font-medium tracking-wide">
                     <span className="w-1.5 h-1.5 bg-lime-400 rounded-full animate-pulse"></span>
-                    ONLINE
+                    POWERED BY GEMINI
                   </p>
                 </div>
               </div>
@@ -162,7 +191,7 @@ export const ChatBot = ({ language }) => {
                     {msg.role === 'user' ? <UserIcon size={16} /> : <Sparkles size={16} />}
                   </div>
                   <div
-                    className={`max-w-[80%] max-w-xs p-3.5 rounded-2xl text-sm leading-relaxed ${
+                    className={`max-w-[80%] p-3.5 rounded-2xl text-sm leading-relaxed ${
                       msg.role === 'user'
                         ? 'bg-emerald-600 text-white rounded-br-none shadow-lg'
                         : 'bg-white/5 text-slate-200 border border-white/5 rounded-bl-none shadow-md backdrop-blur-sm'
@@ -193,7 +222,7 @@ export const ChatBot = ({ language }) => {
                   value={inputValue}
                   onChange={(e) => setInputValue(e.target.value)}
                   onKeyDown={handleKeyPress}
-                  placeholder="Ask about crops..."
+                  placeholder="Ask about crops, pests, or weather..."
                   disabled={isLoading}
                   className="w-full pl-4 pr-12 py-3.5 bg-black/40 border border-white/10 rounded-xl focus:outline-none focus:border-lime-400/50 focus:ring-1 focus:ring-lime-400/20 transition-all text-sm text-white placeholder:text-slate-500"
                 />
@@ -206,7 +235,7 @@ export const ChatBot = ({ language }) => {
                 </button>
               </div>
               <div className="text-center mt-2">
-                 <p className="text-[10px] text-slate-500 font-medium">Powered by Gemini 3 Pro</p>
+                 <p className="text-[10px] text-slate-500 font-medium">Agri-Sentry • Gemini 1.5 Flash</p>
               </div>
             </div>
           </motion.div>

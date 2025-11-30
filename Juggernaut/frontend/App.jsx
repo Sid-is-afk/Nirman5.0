@@ -20,13 +20,13 @@ const App = () => {
   
   // Check if user is already logged in
   const [user, setUser] = useState(() => {
-    const saved = localStorage.getItem('agri_user');
+    const saved = localStorage.getItem('user');
     return saved ? JSON.parse(saved) : null;
   });
 
   // If user is logged in, don't show landing. If not, show landing.
   const [showLanding, setShowLanding] = useState(() => {
-    const savedUser = localStorage.getItem('agri_user');
+    const savedUser = localStorage.getItem('user');
     return !savedUser; 
   });
 
@@ -72,7 +72,7 @@ const App = () => {
     setUser(loggedInUser);
     setShowLanding(false);
     // Save user to storage
-    localStorage.setItem('agri_user', JSON.stringify(loggedInUser));
+    localStorage.setItem('user', JSON.stringify(loggedInUser));
   };
 
   const handleLogout = () => {
@@ -80,7 +80,7 @@ const App = () => {
     setShowLanding(true); 
     setCurrentView(ViewType.DASHBOARD);
     // Clear storage
-    localStorage.removeItem('agri_user');
+   localStorage.removeItem('user');
     localStorage.removeItem('agri_view');
   };
 

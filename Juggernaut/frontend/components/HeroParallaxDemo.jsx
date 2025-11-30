@@ -159,10 +159,10 @@ export function HeroParallaxDemo({ onEnter, lt, language, setLanguage }) {
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                className="absolute -bottom-12 left-1/2 -translate-x-1/2 text-center w-full  pb-10"
+                className="absolute -bottom-12 left-1/2 -translate-x-1/2 text-center w-full pr-15 pb-10"
               >
-                 <span className="text-lime-400 text-xs font-bold tracking-[0.3em] uppercase opacity-70 group-hover:opacity-100 transition-opacity whitespace-nowrap pb-10">
-                   {lt?.clickToInit || "CLICK TO INITIALIZE"}
+                 <span className="text-lime-400 text-2xl text-center font-bold tracking-[0.3em] uppercase opacity-70 group-hover:opacity-100 transition-opacity whitespace-nowrap pb-10">
+                   {lt?.clickToInit || "Click here to begin"}
                  </span>
                  {/* <div className="h-px w-0 group-hover:w-full bg-gradient-to-r from-transparent via-lime-400 to-transparent transition-all duration-700 mx-auto mt-2"></div> */}
               </motion.div>

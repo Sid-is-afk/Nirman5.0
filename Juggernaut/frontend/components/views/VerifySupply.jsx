@@ -1,9 +1,15 @@
 import React, { useState, useRef, useEffect } from 'react';
 import jsQR from 'jsqr';
+import { ethers } from 'ethers'; // BLOCKCHAIN IMPORT
+// Make sure this path points to where you created the folder. 
+// If it errors, try '../blockchain/config' or '../../blockchain/config'
+import { CONTRACT_ADDRESS, CONTRACT_ABI } from '/../blockchain/config';
+
 import { FileUpload } from '../FileUpload';
 import { ShieldCheck, QrCode, CheckCircle, Camera, Loader2, ScanLine, AlertCircle, RefreshCw, XCircle, Package, Lock, Plus, Save, Calendar, Building, Wand2, Image as ImageIcon } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { translations } from '../../translations';
+
 
 // --- CONFIGURATION ---
 const getBaseUrl = () => {
@@ -33,13 +39,12 @@ export const VerifySupply = ({ language }) => {
   const [showRegisterModal, setShowRegisterModal] = useState(false);
   const [isRegistering, setIsRegistering] = useState(false);
   const [isAutoFilling, setIsAutoFilling] = useState(false);
-  const [labelImage, setLabelImage] = useState(null); // Image specifically for label scanning
+  const [labelImage, setLabelImage] = useState(null); 
 
   const [regForm, setRegForm] = useState({
     productName: '',
     manufacturer: '',
     batchNumber: '',
-    expiryDate: ''
   });
 
   const [manualFile, setManualFile] = useState(null);
@@ -47,12 +52,10 @@ export const VerifySupply = ({ language }) => {
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
   const requestRef = useRef(null);
-  const labelInputRef = useRef(null); // Ref for the hidden file input in modal
+  const labelInputRef = useRef(null); 
 
   // --- CAMERA LOGIC ---
-  // Using a dedicated function for starting camera to call it reliably
   const initCamera = async () => {
-    // Don't start if: explicitly inactive, already found code, showing result, or modal is open
     if (!cameraActive || scannedData || verificationResult || showRegisterModal) return;
 
     try {
@@ -72,7 +75,6 @@ export const VerifySupply = ({ language }) => {
       
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
-        // Wait for metadata to load before playing to avoid black screen
         videoRef.current.onloadedmetadata = () => {
             videoRef.current.play()
               .then(() => setCameraLoading(false))
@@ -92,11 +94,8 @@ export const VerifySupply = ({ language }) => {
     }
   };
 
-  // Effect to manage Camera Lifecycle
   useEffect(() => {
     initCamera();
-
-    // Cleanup function: Stop all tracks when component unmounts or dependencies change
     return () => {
       if (videoRef.current && videoRef.current.srcObject) {
         const tracks = videoRef.current.srcObject.getTracks();
@@ -130,7 +129,6 @@ export const VerifySupply = ({ language }) => {
              });
 
              if (code && code.data) {
-               // QR Found!
                handleScannedCode(code.data);
                return; 
              }
@@ -147,7 +145,7 @@ export const VerifySupply = ({ language }) => {
   }, [cameraActive, scannedData, verificationResult, cameraLoading, showRegisterModal]);
 
 
-  // --- VISION API AUTO-FILL ---
+  // --- VISION API AUTO-FILL (Kept existing AI logic) ---
   const handleLabelImageSelect = (e) => {
       const file = e.target.files[0];
       if (file) {
@@ -172,6 +170,7 @@ export const VerifySupply = ({ language }) => {
         const base64Image = reader.result;
 
         try {
+           // We keep your existing AI Vision logic here
            const response = await fetch(`${API_URL}/api/vision/read-label`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
@@ -185,80 +184,113 @@ export const VerifySupply = ({ language }) => {
                  ...prev,
                  manufacturer: data.manufacturer || prev.manufacturer,
                  batchNumber: data.batchNumber || prev.batchNumber,
-                 expiryDate: data.expiryDate ? new Date(data.expiryDate).toISOString().split('T')[0] : prev.expiryDate
               }));
-              // Don't alert, just show visually it worked by filling fields
            } else {
               alert("Could not read text from image.");
            }
         } catch (error) {
            console.error("Vision API Error", error);
-           // Fail silently or show small toast in real app
         } finally {
            setIsAutoFilling(false);
         }
      };
   };
 
-
-  // --- PRODUCT VERIFICATION ---
+  // --- BLOCKCHAIN VERIFICATION (MOBILE FRIENDLY) ---
   const verifyProduct = async (code) => {
     setIsVerifying(true);
+    
     try {
-      const response = await fetch(`${API_URL}/api/products/${encodeURIComponent(code)}`);
+      let provider;
       
-      if (response.ok) {
-        const data = await response.json();
-        setProductData(data);
+      // LOGIC: Check if user has a wallet. If not, use a Public "Read-Only" Connection.
+      if (window.ethereum) {
+          // 1. Desktop with MetaMask (Fastest)
+          provider = new ethers.BrowserProvider(window.ethereum);
+      } else {
+          // 2. Mobile / No Wallet (Public Node)
+          // This allows anyone to READ the blockchain for free
+         provider = new ethers.JsonRpcProvider("https://1rpc.io/sepolia");
+      }
+
+      const contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, provider);
+
+      // Call the Smart Contract function: verifyProduct(qrCodeId)
+      const result = await contract.verifyProduct(code);
+      
+      const isAuthentic = result[3]; 
+
+      if (isAuthentic) {
+        setProductData({
+          qrCodeId: code,
+          productName: result[0],
+          manufacturer: result[1],
+          batchNumber: result[2],
+          isAuthentic: true,
+          expiryDate: new Date().toISOString()
+        });
         setVerificationResult('success');
       } else {
-        setProductData(null);
         setVerificationResult('error');
       }
+
     } catch (error) {
-      console.error("Verification failed:", error);
+      console.error("Blockchain Verification failed:", error);
       setVerificationResult('error');
     } finally {
       setIsVerifying(false);
     }
   };
-
+  // --- BLOCKCHAIN REGISTRATION ---
   const handleRegisterSubmit = async () => {
       if (!regForm.productName || !regForm.manufacturer) {
-         alert("Please fill in at least Product Name and Manufacturer.");
+         alert("Please fill in Product Name and Manufacturer.");
          return;
       }
       setIsRegistering(true);
 
-      const newProductData = {
-          qrCodeId: scannedData || "MANUAL-" + Date.now(),
-          productName: regForm.productName,
-          manufacturer: regForm.manufacturer,
-          batchNumber: regForm.batchNumber || "BATCH-001",
-          expiryDate: regForm.expiryDate || new Date().toISOString(),
-          isAuthentic: true,
-          certifications: ["ISO-9001", "Organic Certified"]
-      };
+      const newQrCodeId = scannedData || "GLS-" + Math.floor(Math.random() * 10000);
 
       try {
-          const response = await fetch(`${API_URL}/api/products`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(newProductData)
-          });
-          
-          const data = await response.json();
-
-          if (response.ok) {
-              setProductData(data);
-              setVerificationResult('success');
-              setShowRegisterModal(false);
-          } else {
-              alert(`Failed: ${data.message || "Unknown Error"}`);
+          if (!window.ethereum) {
+            alert("MetaMask is required to register products.");
+            setIsRegistering(false);
+            return;
           }
+
+          // 1. Connect Wallet (User must approve)
+          const provider = new ethers.BrowserProvider(window.ethereum);
+          const signer = await provider.getSigner(); // This opens MetaMask popup
+          
+          const contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
+
+          // 2. Write to Blockchain
+          console.log("Sending transaction to blockchain...");
+          
+          // Call: registerProduct(qrCodeId, name, manufacturer, batch)
+          const tx = await contract.registerProduct(
+            newQrCodeId,
+            regForm.productName,
+            regForm.manufacturer,
+            regForm.batchNumber || "BATCH-001"
+          );
+
+          // 3. Wait for confirmation (Green Checkmark)
+          await tx.wait();
+
+          alert("Product Registered on Blockchain Successfully!");
+          
+          // Auto-verify the product we just added
+          await verifyProduct(newQrCodeId);
+          setShowRegisterModal(false);
+
       } catch (error) {
           console.error("Registration failed:", error);
-          alert("Error connecting to server.");
+          if(error.reason) {
+             alert(`Blockchain Error: ${error.reason}`);
+          } else {
+             alert("Transaction cancelled or failed.");
+          }
       } finally {
           setIsRegistering(false);
       }
@@ -270,11 +302,47 @@ export const VerifySupply = ({ language }) => {
     verifyProduct(data); 
   };
 
+ // --- REAL FILE SCANNING LOGIC ---
   const handleVerifyManual = () => {
      if (manualFile) {
-        const mockCode = "GLS-" + Date.now(); 
-        setScannedData(mockCode); 
-        verifyProduct(mockCode);
+        setIsVerifying(true); // Show loading spinner
+
+        // 1. Create a generic file reader
+        const reader = new FileReader();
+        
+        reader.onload = (e) => {
+           // 2. Load the uploaded image into memory
+           const image = new Image();
+           image.src = e.target.result;
+
+           image.onload = () => {
+              // 3. Create a temporary canvas to read the pixels
+              const canvas = document.createElement('canvas');
+              const context = canvas.getContext('2d');
+              canvas.width = image.width;
+              canvas.height = image.height;
+              context.drawImage(image, 0, 0);
+
+              // 4. Use jsQR to find the code in the pixels
+              const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+              const code = jsQR(imageData.data, imageData.width, imageData.height, {
+                  inversionAttempts: "dontInvert",
+              });
+
+              if (code && code.data) {
+                 // SUCCESS: Found a QR Code in the file!
+                 setScannedData(code.data);
+                 verifyProduct(code.data);
+              } else {
+                 // FAILURE: No QR Code found
+                 alert("Could not find a QR Code in this image. Please upload a clear photo containing a visible QR code.");
+                 setIsVerifying(false);
+              }
+           };
+        };
+        
+        // Start reading the file
+        reader.readAsDataURL(manualFile);
      }
   };
 
@@ -288,7 +356,7 @@ export const VerifySupply = ({ language }) => {
     setCameraActive(true);
     setShowRegisterModal(false);
     setLabelImage(null);
-    setRegForm({ productName: '', manufacturer: '', batchNumber: '', expiryDate: '' });
+    setRegForm({ productName: '', manufacturer: '', batchNumber: '' });
   };
 
   const toggleCamera = () => {
@@ -305,8 +373,8 @@ export const VerifySupply = ({ language }) => {
       {/* Header */}
       <div className="mb-6 md:mb-8 text-center md:text-left">
         <h2 className="text-2xl md:text-3xl font-bold text-emerald-900 flex items-center justify-center md:justify-start gap-3">
-          <ShieldCheck className="text-emerald-600 shrink-0" size={32} md={36} />
-          {t.verifyHeader}
+          <ShieldCheck className="text-emerald-600 shrink-0" size={32} />
+          {t.verifyHeader} <span className="text-xs bg-indigo-100 text-indigo-700 px-2 py-1 rounded-full border border-indigo-200">Blockchain Powered</span>
         </h2>
         <p className="text-slate-500 mt-2 text-base md:text-lg max-w-2xl mx-auto md:mx-0">
           {t.verifySub}
@@ -377,13 +445,14 @@ export const VerifySupply = ({ language }) => {
                <div className="text-slate-500 flex flex-col items-center p-8 text-center z-10 relative w-full">
                  {isVerifying ? (
                      <div className="flex flex-col items-center">
-                         <Loader2 size={48} className="text-emerald-500 animate-spin mb-4" />
-                         <p className="text-white font-medium">Verifying Product...</p>
+                         <Loader2 size={48} className="text-indigo-400 animate-spin mb-4" />
+                         <p className="text-white font-medium">Connecting to Blockchain...</p>
+                         <p className="text-slate-400 text-xs mt-2">Checking Sepolia Network</p>
                      </div>
                  ) : scannedData ? (
                     <motion.div initial={{ scale: 0.8 }} animate={{ scale: 1 }} className="flex flex-col items-center">
                       <div className="w-20 h-20 md:w-24 md:h-24 rounded-full bg-emerald-900/90 text-lime-400 flex items-center justify-center mb-6 border-4 border-emerald-500/30 shadow-[0_0_30px_rgba(16,185,129,0.4)]">
-                        <CheckCircle size={40} md={48} />
+                        <CheckCircle size={40} />
                       </div>
                       <p className="text-white mb-2 font-bold text-xl md:text-2xl">{t.codeDetected}</p>
                       <div className="bg-white/10 backdrop-blur-md px-6 py-3 rounded-xl border border-white/10 mb-4">
@@ -433,7 +502,7 @@ export const VerifySupply = ({ language }) => {
                    <div className="space-y-2 text-sm">
                       <div className="flex justify-between"><span className="text-slate-500">Manufacturer:</span><span className="font-bold text-emerald-900">{productData.manufacturer}</span></div>
                       <div className="flex justify-between"><span className="text-slate-500">Batch No:</span><span className="font-mono text-slate-700">{productData.batchNumber}</span></div>
-                      <div className="flex justify-between"><span className="text-slate-500">Expiry:</span><span className="font-medium text-red-500">{new Date(productData.expiryDate).toLocaleDateString()}</span></div>
+                      <div className="flex justify-between"><span className="text-slate-500">Status:</span><span className="font-medium text-emerald-600 flex items-center gap-1"><ShieldCheck size={14}/> Verified on Blockchain</span></div>
                    </div>
                    <div className="h-px bg-emerald-200 w-full my-4"></div>
                    <p className="text-emerald-600 text-xs text-center break-all font-mono">ID: {productData.qrCodeId}</p>
@@ -445,11 +514,11 @@ export const VerifySupply = ({ language }) => {
             {verificationResult === 'error' && (
                <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="absolute inset-0 z-30 bg-white/95 backdrop-blur-xl rounded-3xl border border-red-200 flex flex-col items-center justify-center p-6 md:p-8 text-center shadow-2xl min-h-[400px]">
                 <div className="w-20 h-20 bg-red-100 text-red-600 rounded-full flex items-center justify-center mb-4"><AlertCircle size={40} /></div>
-                <h3 className="text-2xl font-bold text-red-900 mb-2">Product Not Found</h3>
-                <p className="text-slate-500 mb-6 max-w-xs">QR code ({scannedData}) is not in our database.</p>
+                <h3 className="text-2xl font-bold text-red-900 mb-2">Not Found on Blockchain</h3>
+                <p className="text-slate-500 mb-6 max-w-xs">QR code ({scannedData}) is not in the decentralized registry.</p>
                 <div className="flex flex-col gap-3 w-full max-w-xs">
                   <button onClick={resetVerification} className="w-full px-6 py-3 bg-slate-900 text-white rounded-xl font-bold hover:bg-slate-800 transition-colors">Try Again</button>
-                  <button onClick={() => { setVerificationResult(null); setShowRegisterModal(true); }} className="w-full px-6 py-3 bg-blue-50 text-blue-600 border border-blue-200 rounded-xl font-bold hover:bg-blue-100 transition-colors flex items-center justify-center gap-2"><Plus size={18} /> Register Product</button>
+                  <button onClick={() => { setVerificationResult(null); setShowRegisterModal(true); }} className="w-full px-6 py-3 bg-indigo-50 text-indigo-600 border border-indigo-200 rounded-xl font-bold hover:bg-indigo-100 transition-colors flex items-center justify-center gap-2"><Plus size={18} /> Register Product</button>
                 </div>
              </motion.div>
             )}
@@ -460,8 +529,8 @@ export const VerifySupply = ({ language }) => {
             {showRegisterModal && (
                <motion.div initial={{ opacity: 0, y: 50 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 50 }} className="absolute inset-0 z-40 bg-white rounded-3xl p-6 md:p-8 flex flex-col overflow-y-auto shadow-2xl">
                   <div className="flex justify-between items-center mb-6">
-                     <h3 className="text-xl font-bold text-slate-800">Register New Product</h3>
-                     <button onClick={() => setShowRegisterModal(false)} className="p-2 bg-slate-100 rounded-full"><XCircle size={20} /></button>
+                      <h3 className="text-xl font-bold text-slate-800">Register on Blockchain</h3>
+                      <button onClick={() => setShowRegisterModal(false)} className="p-2 bg-slate-100 rounded-full"><XCircle size={20} /></button>
                   </div>
                   <div className="space-y-4 flex-1">
                      <div className="bg-indigo-50 p-4 rounded-xl border border-indigo-100 mb-4 flex flex-col gap-3">
@@ -476,17 +545,14 @@ export const VerifySupply = ({ language }) => {
                         <input type="file" ref={labelInputRef} onChange={handleLabelImageSelect} accept="image/*" capture="environment" className="hidden" />
                      </div>
 
-                     <div><label className="text-xs font-bold text-slate-500 uppercase mb-1 block">QR Code ID</label><div className="p-3 bg-slate-100 rounded-xl font-mono text-sm text-slate-600 break-all border border-slate-200">{scannedData || "MANUAL-ENTRY"}</div></div>
+                     <div><label className="text-xs font-bold text-slate-500 uppercase mb-1 block">QR Code ID (Immutable)</label><div className="p-3 bg-slate-100 rounded-xl font-mono text-sm text-slate-600 break-all border border-slate-200">{scannedData || "GENERATED-ON-SUBMIT"}</div></div>
                      <div><label className="text-xs font-bold text-slate-500 uppercase mb-1 block">Product Name</label><input type="text" className="w-full pl-4 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-emerald-500" placeholder="e.g. GreenLife Seeds" value={regForm.productName} onChange={(e) => setRegForm({...regForm, productName: e.target.value})} /></div>
                      <div><label className="text-xs font-bold text-slate-500 uppercase mb-1 block">Manufacturer</label><input type="text" className="w-full pl-4 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-emerald-500" placeholder="e.g. GreenLife Ltd" value={regForm.manufacturer} onChange={(e) => setRegForm({...regForm, manufacturer: e.target.value})} /></div>
-                     <div className="grid grid-cols-2 gap-4">
-                        <div><label className="text-xs font-bold text-slate-500 uppercase mb-1 block">Batch No.</label><input type="text" className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-emerald-500" placeholder="B-001" value={regForm.batchNumber} onChange={(e) => setRegForm({...regForm, batchNumber: e.target.value})} /></div>
-                        <div><label className="text-xs font-bold text-slate-500 uppercase mb-1 block">Expiry Date</label><input type="date" className="w-full pl-4 pr-3 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-emerald-500 text-sm" value={regForm.expiryDate} onChange={(e) => setRegForm({...regForm, expiryDate: e.target.value})} /></div>
-                     </div>
+                     <div><label className="text-xs font-bold text-slate-500 uppercase mb-1 block">Batch No.</label><input type="text" className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-emerald-500" placeholder="B-001" value={regForm.batchNumber} onChange={(e) => setRegForm({...regForm, batchNumber: e.target.value})} /></div>
                   </div>
-                  <button onClick={handleRegisterSubmit} disabled={isRegistering || !regForm.productName} className={`w-full py-4 mt-6 rounded-xl font-bold text-white flex items-center justify-center gap-2 transition-all ${isRegistering || !regForm.productName ? 'bg-slate-300 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700 shadow-lg'}`}>
+                  <button onClick={handleRegisterSubmit} disabled={isRegistering || !regForm.productName} className={`w-full py-4 mt-6 rounded-xl font-bold text-white flex items-center justify-center gap-2 transition-all ${isRegistering || !regForm.productName ? 'bg-slate-300 cursor-not-allowed' : 'bg-indigo-600 hover:bg-indigo-700 shadow-lg'}`}>
                      {isRegistering ? <Loader2 size={20} className="animate-spin" /> : <Save size={20} />}
-                     {isRegistering ? "Saving..." : "Save to Database"}
+                     {isRegistering ? "Signing Transaction..." : "Save to Blockchain"}
                   </button>
                </motion.div>
             )}

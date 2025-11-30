@@ -1,21 +1,28 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { FileUpload } from '../FileUpload';
-import { Stethoscope, Activity, Loader2, CheckCircle2, AlertOctagon, ShieldCheck, Leaf, AlertTriangle, Camera, Upload, X, RefreshCw, SwitchCamera } from 'lucide-react';
+import { Stethoscope, Activity, Loader2, CheckCircle2, AlertOctagon, ShieldCheck, Leaf, AlertTriangle, Camera, Upload, X, RefreshCw, SwitchCamera, CloudUpload, FileCheck, Search, Trash2, Calendar } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { ResultsActions } from './ResultsActions';
 import { translations } from '../../translations';
 
 // --- CONFIGURATION ---
 const getBaseUrl = () => {
   if (window.location.hostname === 'localhost') {
-    return "http://localhost:5000";
+    return "http://localhost:5001"; 
   }
-  return `http://${window.location.hostname}:5000`;
+  return `http://${window.location.hostname}:5001`; 
 };
 const API_URL = getBaseUrl();
+
+// Node.js Backend (For History/Database)
+const DB_URL = "http://localhost:5000"; 
 
 export const FieldDoctor = ({ language }) => {
   const t = translations[language];
   
+  // 1. STATE: Selected Language for the NEXT scan
+  const [selectedScanLang, setSelectedScanLang] = useState('en');
+
   // States
   const [hasFile, setHasFile] = useState(false);
   const [diagnosing, setDiagnosing] = useState(false);
@@ -25,11 +32,81 @@ export const FieldDoctor = ({ language }) => {
   // Camera States
   const [isCameraOpen, setIsCameraOpen] = useState(false);
   const [facingMode, setFacingMode] = useState('environment'); 
+
+  // --- HISTORY STATE ---
+  const [history, setHistory] = useState([]);
+  const user = JSON.parse(localStorage.getItem('user')); 
+  
+  // *** ADDED: STATE FOR MODAL VIEWING ***
+  const [viewingScan, setViewingScan] = useState(null);
+  
+  // *** NEW: Refs for PDF Generation ***
+  const reportRef = useRef(null);
+  const modalReportRef = useRef(null); // Added for Modal PDF
+  const [deletingIds, setDeletingIds] = useState([]);
+
+  // Fetch History on Load
+  const fetchHistory = async () => {
+      if(!user || !user._id) return;
+      try {
+          const res = await fetch(`${DB_URL}/api/scans/history/${user._id}`);
+          const data = await res.json();
+          setHistory(data.filter(item => item.scanType === 'disease').reverse()); // Show newest first
+      } catch(err) { console.error(err); }
+  };
+
+  useEffect(() => {
+      fetchHistory();
+      window.addEventListener('scanSaved', fetchHistory);
+      return () => window.removeEventListener('scanSaved', fetchHistory);
+  }, []);
+const handleDelete = async (e, scanId) => {
+  e.stopPropagation(); // prevent opening modal when deleting
+
+  if (!window.confirm("Delete this record?")) return;
+  if (!user || !user._id) {
+    alert("You must be logged in to delete records.");
+    return;
+  }
+
+  // Snapshot previous history to allow rollback on failure
+  const prevHistory = history;
+  const itemToDelete = history.find(h => h._id === scanId);
+
+  // Optimistically remove from UI
+  setHistory(prev => prev.filter(item => item._id !== scanId));
+  // Mark as deleting (so UI can show spinner / disable button)
+  setDeletingIds(prev => [...prev, scanId]);
+
+  try {
+    const res = await fetch(`${DB_URL}/api/scans/delete/${user._id}/${scanId}`, {
+      method: 'DELETE',
+    });
+
+    if (!res.ok) {
+      // If backend returned error, throw to go to catch block
+      const text = await res.text().catch(() => 'Delete failed');
+      throw new Error(text || 'Delete failed');
+    }
+
+    // Success: remove id from deleting list
+    setDeletingIds(prev => prev.filter(id => id !== scanId));
+    // Optionally re-fetch history to ensure server-state sync
+    // await fetchHistory();
+  } catch (err) {
+    console.error('Delete error:', err);
+    // Rollback: restore previous history
+    setHistory(prevHistory);
+    // Remove from deleting list
+    setDeletingIds(prev => prev.filter(id => id !== scanId));
+    alert('Could not delete record. Please try again.');
+  }
+};
   
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
 
-  // --- Camera Logic (Same as before) ---
+  // --- Camera Logic ---
   const startCameraStream = async () => {
     try {
       if (videoRef.current && videoRef.current.srcObject) {
@@ -86,7 +163,7 @@ export const FieldDoctor = ({ language }) => {
         ctx.scale(-1, 1);
       }
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-      const imageUrl = canvas.toDataURL('image/jpeg', 0.8); // Compress for faster upload
+      const imageUrl = canvas.toDataURL('image/jpeg', 0.8);
       setCapturedImage(imageUrl);
       setHasFile(true);
       setIsCameraOpen(false);
@@ -94,7 +171,6 @@ export const FieldDoctor = ({ language }) => {
   };
 
   const handleFileSelect = (file) => {
-    // Convert File to Base64 string for uploading
     const reader = new FileReader();
     reader.onloadend = () => {
         setCapturedImage(reader.result);
@@ -104,33 +180,28 @@ export const FieldDoctor = ({ language }) => {
     reader.readAsDataURL(file);
   };
 
-  // --- REAL API CALL ---
+  // --- API CALL ---
   const handleDiagnose = async () => {
     if (!capturedImage) return;
-    
     setDiagnosing(true);
-    
     try {
       const response = await fetch(`${API_URL}/api/scans/diagnose`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ image: capturedImage }),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+            image: capturedImage,
+            language: selectedScanLang 
+        }), 
       });
 
-      if (!response.ok) {
-        throw new Error('Diagnosis failed');
-      }
+      if (!response.ok) throw new Error('Diagnosis failed');
 
       const data = await response.json();
-      
-      // Use the data from the server (it matches our Scan model structure)
-      setDiagnosisResult(data.diagnosis);
+      setDiagnosisResult(data.diagnosis); 
 
     } catch (error) {
-      console.error("Diagnosis failed", error);
-      alert("Failed to connect to the diagnosis server.");
+      console.error(error);
+      alert("Server Error. Ensure Python backend is running on Port 5001.");
     } finally {
       setDiagnosing(false);
     }
@@ -144,7 +215,7 @@ export const FieldDoctor = ({ language }) => {
 
   // Helper for dynamic UI styles
   const getSeverityStyles = (severity) => {
-    switch (severity) {
+    switch (severity?.toLowerCase()) {
       case 'high':
         return {
           bg: 'bg-red-50',
@@ -153,7 +224,9 @@ export const FieldDoctor = ({ language }) => {
           subText: 'text-red-700',
           accent: 'text-red-600',
           badge: 'bg-red-100 text-red-700 border-red-200',
-          icon: <AlertOctagon size={18} className="text-red-600" />
+          icon: <AlertOctagon size={18} className="text-red-600" />,
+          gradient: 'from-red-500 to-rose-600', // Added for modal
+          label: 'CRITICAL' // Added for modal
         };
       case 'medium':
         return {
@@ -163,7 +236,9 @@ export const FieldDoctor = ({ language }) => {
           subText: 'text-amber-700',
           accent: 'text-amber-600',
           badge: 'bg-amber-100 text-amber-700 border-amber-200',
-          icon: <AlertTriangle size={18} className="text-amber-600" />
+          icon: <AlertTriangle size={18} className="text-amber-600" />,
+          gradient: 'from-amber-400 to-orange-500', // Added for modal
+          label: 'MODERATE' // Added for modal
         };
       case 'healthy':
         return {
@@ -173,7 +248,9 @@ export const FieldDoctor = ({ language }) => {
           subText: 'text-emerald-700',
           accent: 'text-emerald-600',
           badge: 'bg-emerald-100 text-emerald-700 border-emerald-200',
-          icon: <ShieldCheck size={18} className="text-emerald-600" />
+          icon: <ShieldCheck size={18} className="text-emerald-600" />,
+          gradient: 'from-emerald-500 to-green-600', // Added for modal
+          label: 'HEALTHY' // Added for modal
         };
       default:
         return {
@@ -183,16 +260,107 @@ export const FieldDoctor = ({ language }) => {
           subText: 'text-slate-700',
           accent: 'text-slate-600',
           badge: 'bg-slate-100 text-slate-700 border-slate-200',
-          icon: <Leaf size={18} />
+          icon: <Leaf size={18} />,
+          gradient: 'from-blue-400 to-indigo-500', // Added for modal
+          label: 'UNKNOWN' // Added for modal
         };
     }
   };
 
-  const styles = diagnosisResult ? getSeverityStyles(diagnosisResult.severity) : null;
+  const activeResult = diagnosisResult;
+  const styles = activeResult ? getSeverityStyles(activeResult.severity) : null;
+
+  // *** ADDED: RENDER MODAL CONTENT ***
+  const renderModalContent = () => {
+    if (!viewingScan) return null;
+    const result = viewingScan.resultData;
+    const modalStyles = getSeverityStyles(result.severity);
+    // Create instance of icon
+    const ModalIcon = modalStyles.icon;
+
+    return (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+            <motion.div 
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                className="bg-white w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-3xl shadow-2xl relative"
+            >
+                <div className="sticky top-0 z-20 flex items-center justify-between p-4 bg-white/90 backdrop-blur-md border-b border-slate-100">
+                    <h3 className="font-bold text-lg text-slate-800 flex items-center gap-2">
+                        <FileCheck className="text-emerald-500" size={20} /> Saved Report
+                    </h3>
+                    <button onClick={() => setViewingScan(null)} className="p-2 bg-slate-100 rounded-full hover:bg-slate-200 transition-colors">
+                        <X size={20} />
+                    </button>
+                </div>
+
+                <div className="p-6 space-y-6" ref={modalReportRef}>
+                    <div className="w-full h-56 bg-slate-900 rounded-2xl overflow-hidden shadow-md">
+                        <img src={viewingScan.image} alt="Scan" className="w-full h-full object-contain" />
+                    </div>
+
+                    {/* Severity Card in Modal */}
+                    <div className={`relative overflow-hidden rounded-2xl p-6 text-white bg-gradient-to-br ${modalStyles.gradient} shadow-lg`}>
+                        <div className="relative z-10">
+                            <div className="flex items-center gap-2 mb-2 opacity-90">
+                                {ModalIcon}
+                                <span className="text-xs font-bold tracking-widest">{modalStyles.label}</span>
+                            </div>
+                            <h3 className="text-2xl font-bold mb-2">{viewingScan.name}</h3>
+                            <p className="text-white/90 text-sm bg-white/10 p-3 rounded-lg border border-white/10 leading-relaxed">
+                                "{result.description}"
+                            </p>
+                        </div>
+                    </div>
+
+                    {/* Treatments in Modal */}
+                    {result.severity !== 'healthy' && (
+                      <div className="bg-slate-50 rounded-2xl p-5 border border-slate-200">
+                          <h4 className="font-bold text-slate-800 mb-4 flex items-center gap-2">
+                              <Activity size={18} className="text-blue-500" /> Recommended Treatment
+                          </h4>
+                          <div className="space-y-4 relative pl-2">
+                              <div className="absolute left-[15px] top-2 bottom-2 w-0.5 bg-slate-200"></div>
+                              {result.treatments?.map((t, idx) => (
+                                  <div key={idx} className="relative flex gap-3">
+                                      <div className="w-8 h-8 shrink-0 rounded-full bg-white border-2 border-slate-200 flex items-center justify-center z-10 text-xs font-bold text-slate-500">
+                                          {idx + 1}
+                                      </div>
+                                      <p className="text-sm text-slate-600 pt-1 leading-relaxed">{t}</p>
+                                  </div>
+                              ))}
+                          </div>
+                      </div>
+                    )}
+                    
+                    <div className="text-center text-xs text-slate-400 pt-4 border-t border-slate-100">
+                        Scan Date: {new Date(viewingScan.date).toLocaleString()}
+                    </div>
+                </div>
+                
+                {/* Actions in Modal */}
+                <div className="p-6 pt-0 bg-white">
+                   <ResultsActions 
+                        data={result} 
+                        image={viewingScan.image} 
+                        type="disease" 
+                        reportRef={modalReportRef} 
+                    />
+                </div>
+            </motion.div>
+        </div>
+    );
+  };
 
   return (
-    <div className="space-y-4 md:space-y-6 pb-20 md:pb-0">
+    <div className="space-y-4 md:space-y-6 pb-20 md:pb-0 relative">
        
+       {/* *** ADDED: MODAL RENDERER *** */}
+       <AnimatePresence>
+         {viewingScan && renderModalContent()}
+       </AnimatePresence>
+
        {/* Header */}
        <div className="mb-4 md:mb-8 text-center md:text-left">
         <h2 className="text-2xl md:text-3xl font-bold text-emerald-900 flex items-center justify-center md:justify-start gap-3">
@@ -271,6 +439,29 @@ export const FieldDoctor = ({ language }) => {
                       </button>
                    </div>
                    
+                   {/* Language Selector */}
+                   {!diagnosisResult && (
+                    <div className="flex gap-2 mb-4 justify-center w-full">
+                        {[
+                        { code: 'en', label: 'English' },
+                        { code: 'hi', label: 'हिंदी' },
+                        { code: 'or', label: 'ଓଡ଼ିଆ' }
+                        ].map((lang) => (
+                        <button
+                            key={lang.code}
+                            onClick={() => setSelectedScanLang(lang.code)}
+                            className={`flex-1 py-2 rounded-xl border transition-all font-bold text-sm ${
+                            selectedScanLang === lang.code
+                                ? 'bg-lime-600 text-white border-lime-600 shadow-md transform scale-105'
+                                : 'bg-white text-slate-500 border-slate-200 hover:border-lime-400'
+                            }`}
+                        >
+                            {lang.label}
+                        </button>
+                        ))}
+                    </div>
+                   )}
+
                    {!diagnosisResult && (
                      <button 
                        onClick={handleDiagnose}
@@ -321,7 +512,6 @@ export const FieldDoctor = ({ language }) => {
                         <span className="block font-bold text-lg text-slate-700">Upload File</span>
                         <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Browse Gallery</span>
                       </div>
-                      {/* Invisible File Input Overlay */}
                       <div className="absolute inset-0 opacity-0 cursor-pointer">
                          <FileUpload label="" onFileSelect={handleFileSelect} className="w-full h-full" />
                       </div>
@@ -365,7 +555,7 @@ export const FieldDoctor = ({ language }) => {
 
                {hasFile && !diagnosisResult && !diagnosing && (
                  <div className="text-center py-10 opacity-50">
-                    <p>Image Ready. Click "Diagnose" to begin.</p>
+                    <p>Select Language & Click Diagnose.</p>
                  </div>
                )}
 
@@ -376,34 +566,35 @@ export const FieldDoctor = ({ language }) => {
                   </div>
                )}
 
-               {diagnosisResult && styles && (
+               {activeResult && styles && (
                  <motion.div 
                    initial={{ opacity: 0, y: 10 }}
                    animate={{ opacity: 1, y: 0 }}
                    className="w-full"
                  >
-                   <div className={`${styles.bg} p-5 md:p-6 rounded-2xl border ${styles.border} shadow-sm mb-6 relative overflow-hidden`}>
+                   {/* --- REPORT CONTENT (Wrapped in Ref for PDF) --- */}
+                   <div ref={reportRef} className={`${styles.bg} p-5 md:p-6 rounded-2xl border ${styles.border} shadow-sm mb-6 relative overflow-hidden`}>
                      <div className={`absolute top-0 left-0 w-1 h-full ${styles.text.replace('text', 'bg').replace('900', '500')}`}></div>
                      
                      <div className="flex flex-col md:flex-row justify-between items-start mb-4 gap-2">
                        <div>
-                         <h4 className={`text-xl md:text-2xl font-bold ${styles.text}`}>{diagnosisResult.diseaseName}</h4>
-                         <p className={`text-sm font-mono mt-1 opacity-80 ${styles.subText}`}>{diagnosisResult.pathogen}</p>
+                         <h4 className={`text-xl md:text-2xl font-bold ${styles.text}`}>{activeResult.diseaseName}</h4>
+                          <p className={`text-sm font-mono mt-1 opacity-80 ${styles.subText}`}>{activeResult.pathogen}</p>
                        </div>
                        <span className={`${styles.badge} text-xs font-bold px-3 py-1 rounded-full border self-start`}>
-                         {Math.round(diagnosisResult.confidence * 100)}% {t.confidence}
+                        {Math.round(activeResult.confidence * 100)}% {t.confidence}
                        </span>
                      </div>
                      
                      <p className={`text-sm mb-6 ${styles.subText} bg-white/40 p-3 rounded-lg italic`}>
-                       "{diagnosisResult.description}"
+                       "{activeResult.description}"
                      </p>
 
                      <div className="space-y-4">
                         <div className={`p-3 bg-white/60 rounded-lg border ${styles.border} text-sm ${styles.text} flex gap-3 shadow-sm`}>
                            <div className="shrink-0 pt-0.5">{styles.icon}</div>
                            <p className="font-medium">
-                             {diagnosisResult.severity === 'healthy' 
+                            {activeResult.severity === 'healthy'
                                ? 'Plant appears healthy. No action needed.' 
                                : t.immediateAction}
                            </p>
@@ -414,20 +605,32 @@ export const FieldDoctor = ({ language }) => {
                              <Activity size={14} /> {t.recommendedTreatment}
                            </p>
                            <ul className="text-sm text-slate-700 space-y-2 bg-white p-4 rounded-xl border border-slate-100">
-                             {diagnosisResult.treatments.map((treatment, idx) => (
+                            {activeResult.treatments.map((treatment, idx) => (
                                <li key={idx} className="flex items-start gap-2">
                                  <CheckCircle2 size={16} className={`${styles.accent} shrink-0 mt-0.5`} />
                                  <span className="leading-snug">{treatment}</span>
                                </li>
-                             ))}
+                            ))}
                            </ul>
                         </div>
                      </div>
+                     
+                     <div className="mt-6 pt-4 border-t border-slate-200/50 text-center text-xs text-slate-400 hidden print:block">
+                        Generated by Agri-Sentry AI • {new Date().toLocaleDateString()}
+                     </div>
                    </div>
+
+                   {/* --- SAVE & SHARE ACTIONS --- */}
+                   <ResultsActions 
+                      data={activeResult} 
+                      image={capturedImage} 
+                      type="disease" 
+                      reportRef={reportRef} 
+                   />
 
                    <button 
                      onClick={resetProcess}
-                     className="w-full py-3 md:py-4 border border-slate-200 text-slate-600 rounded-xl font-bold hover:bg-slate-50 hover:border-slate-300 transition-all flex items-center justify-center gap-2"
+                     className="w-full py-3 md:py-4 mt-6 border border-slate-200 text-slate-600 rounded-xl font-bold hover:bg-slate-50 hover:border-slate-300 transition-all flex items-center justify-center gap-2"
                    >
                      <RefreshCw size={18} />
                      {t.reset}
@@ -440,6 +643,63 @@ export const FieldDoctor = ({ language }) => {
 
         </div>
       </div>
+
+      {/* --- PREVIOUS DIAGNOSES --- */}
+      {/* <div className="mt-12 pt-8 border-t border-slate-200">
+        <h3 className="text-xl font-bold text-slate-800 mb-6 flex items-center gap-2">
+            <Activity className="text-emerald-600" /> Your Previous Diagnoses
+        </h3>
+        
+        {!user ? (
+            <div className="text-center p-8 bg-slate-50 rounded-2xl border border-dashed border-slate-300">
+                <p className="text-slate-500">Please log in to view your history.</p>
+            </div>
+        ) : history.length === 0 ? (
+            <div className="text-center p-8 bg-slate-50 rounded-2xl border border-dashed border-slate-300">
+                <p className="text-slate-500">No saved diagnoses yet. Scan a plant to get started!</p>
+            </div>
+        ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {history.map((scan) => (
+                    // *** ADDED ONCLICK TO OPEN MODAL ***
+                    <div 
+                        key={scan._id} 
+                        onClick={() => setViewingScan(scan)}
+                        className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow flex gap-4 items-start relative group cursor-pointer"
+                    >
+                        <img src={scan.image} alt="Thumbnail" className="w-16 h-16 rounded-xl object-cover bg-slate-100 shrink-0" />
+                        <div className="flex-1 min-w-0">
+                            <h4 className="font-bold text-slate-800 truncate text-sm">{scan.name}</h4>
+                            <p className="text-xs text-slate-500 mb-2">{new Date(scan.date).toLocaleDateString()}</p>
+                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider ${
+                                scan.severity?.toLowerCase() === 'high' ? 'bg-red-100 text-red-700' : 
+                                scan.severity?.toLowerCase() === 'medium' ? 'bg-amber-100 text-amber-700' :
+                                'bg-emerald-100 text-emerald-700'
+                            }`}>
+                                {scan.severity}
+                            </span>
+                        </div>
+<button
+  onClick={(e) => handleDelete(e, scan._id)}
+  className={`absolute top-2 right-2 p-1.5 rounded-lg transition-all
+              opacity-40 group-hover:opacity-100 hover:scale-105
+              bg-white/50 backdrop-blur-sm shadow-sm`}
+  aria-label={deletingIds.includes(scan._id) ? 'Deleting' : 'Delete'}
+  disabled={deletingIds.includes(scan._id)}
+  title={deletingIds.includes(scan._id) ? 'Deleting...' : 'Delete'}
+  style={{ pointerEvents: deletingIds.includes(scan._id) ? 'none' : 'auto', zIndex: 30 }}
+>
+  {deletingIds.includes(scan._id) ? (
+    <Loader2 size={16} className="animate-spin text-slate-500" />
+  ) : (
+    <Trash2 size={16} className="text-slate-600 hover:text-red-600" />
+  )}
+</button>
+                    </div>
+                ))}
+            </div>
+        )}
+      </div> */}
     </div>
   );
 };

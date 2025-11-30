@@ -1,0 +1,7 @@
+flask
+flask-cors
+ultralytics
+google-generativeai
+Pillow
+python-dotenv
+numpy

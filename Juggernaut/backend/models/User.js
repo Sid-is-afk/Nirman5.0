@@ -8,14 +8,14 @@ const userSchema = new mongoose.Schema({
   email: { 
     type: String, 
     unique: true, 
-    sparse: true, // Allows multiple users to have 'null' email if they used phone
+    sparse: true, 
     trim: true,
     lowercase: true
   },
   phone: { 
     type: String, 
     unique: true, 
-    sparse: true // Allows multiple users to have 'null' phone if they used email
+    sparse: true 
   },
   password: { 
     type: String, 
@@ -26,6 +26,29 @@ const userSchema = new mongoose.Schema({
     enum: ['farmer', 'expert', 'admin'],
     default: 'farmer'
   },
+  
+
+  farmName: { type: String, default: '' },
+  location: { type: String, default: '' },
+  cropTypes: { type: String, default: '' },
+  avatar: { type: String, default: '' },
+  notifications: {
+    storm: { type: Boolean, default: true },
+    pest: { type: Boolean, default: true },
+    market: { type: Boolean, default: false }
+  },
+
+
+  scanHistory: [{
+    scanType: { type: String, enum: ['disease', 'pest'] }, 
+    name: String,       
+    severity: String,   
+    confidence: Number, 
+    date: { type: Date, default: Date.now },
+    image: String,  
+    resultData: Object  
+  }],
+
   createdAt: { 
     type: Date, 
     default: Date.now 

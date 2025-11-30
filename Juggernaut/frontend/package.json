@@ -10,8 +10,13 @@
   },
   "dependencies": {
     "@google/genai": "^1.30.0",
+    "@google/generative-ai": "^0.24.1",
     "clsx": "^2.1.1",
+    "ethers": "^6.15.0",
+    "firebase": "^12.6.0",
     "framer-motion": "^12.23.24",
+    "html2canvas": "^1.4.1",
+    "jspdf": "^3.0.4",
     "jsqr": "1.4.0",
     "leaflet": "1.9.4",
     "lucide-react": "^0.554.0",

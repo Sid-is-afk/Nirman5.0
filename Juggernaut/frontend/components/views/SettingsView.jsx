@@ -1,7 +1,10 @@
-import React, { useState, useRef } from 'react';
-import { Settings, User, Bell, Save, Check, Camera, Languages, MapPin, Sprout, Loader2, Upload } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
+import { Settings, User, Bell, Save, Check, Camera, Languages, MapPin, Sprout, Loader2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { translations } from '../../translations';
+
+// Define Backend URL (Node.js runs on 5000 usually)
+const API_URL = "http://localhost:5000/api/auth";
 
 export const SettingsView = ({ language, user }) => {
   const t = translations[language];
@@ -9,18 +12,12 @@ export const SettingsView = ({ language, user }) => {
   const [isSaving, setIsSaving] = useState(false);
   const [saved, setSaved] = useState(false);
 
-  // Form States
-  const [farmName, setFarmName] = useState('Green Valley Estate');
-  const [cropTypes, setCropTypes] = useState('Rice, Wheat, Cotton');
-  const [location, setLocation] = useState('Punjab, India');
-  const [avatar, setAvatar] = useState(null); // State for profile image
+  // --- Form States ---
+  const [farmName, setFarmName] = useState('');
+  const [cropTypes, setCropTypes] = useState('');
+  const [location, setLocation] = useState('');
+  const [avatar, setAvatar] = useState(null);
   
-  // Location State
-  const [isLocating, setIsLocating] = useState(false);
-
-  // Refs
-  const fileInputRef = useRef(null);
-
   // Notification States
   const [notifications, setNotifications] = useState({
     storm: true,
@@ -28,12 +25,31 @@ export const SettingsView = ({ language, user }) => {
     market: false
   });
 
-  // --- Image Upload Logic ---
+  const [isLocating, setIsLocating] = useState(false);
+  const fileInputRef = useRef(null);
+
+  // --- 1. LOAD DATA ON MOUNT ---
+  useEffect(() => {
+    // If the user prop has data, load it into the form
+    if (user) {
+        setFarmName(user.farmName || 'Green Valley Estate');
+        setCropTypes(user.cropTypes || 'Rice, Wheat, Cotton');
+        setLocation(user.location || 'Punjab, India');
+        setAvatar(user.avatar || null);
+        if(user.notifications) setNotifications(user.notifications);
+    }
+  }, [user]);
+
+  // --- Image Upload Logic (Base64) ---
   const handleImageUpload = (e) => {
     const file = e.target.files[0];
     if (file) {
-      const imageUrl = URL.createObjectURL(file);
-      setAvatar(imageUrl);
+      // Convert to Base64 to save in MongoDB easily
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setAvatar(reader.result);
+      };
+      reader.readAsDataURL(file);
     }
   };
 
@@ -43,32 +59,22 @@ export const SettingsView = ({ language, user }) => {
       alert("Geolocation is not supported by your browser.");
       return;
     }
-
     setIsLocating(true);
-
     navigator.geolocation.getCurrentPosition(
       async (position) => {
         const { latitude, longitude } = position.coords;
-        
         try {
-          // Using a free API to convert coordinates to City/State (Reverse Geocoding)
-          // Note: In a real production app, you might use Google Maps API key here.
           const response = await fetch(
             `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${latitude}&longitude=${longitude}&localityLanguage=en`
           );
           const data = await response.json();
-          
           const city = data.city || data.locality || "";
           const region = data.principalSubdivision || data.countryName || "";
           
-          if (city && region) {
-            setLocation(`${city}, ${region}`);
-          } else {
-            setLocation(`${latitude.toFixed(4)}, ${longitude.toFixed(4)}`);
-          }
+          if (city && region) setLocation(`${city}, ${region}`);
+          else setLocation(`${latitude.toFixed(4)}, ${longitude.toFixed(4)}`);
         } catch (error) {
           console.error("Error fetching address:", error);
-          // Fallback to coordinates if API fails
           setLocation(`${latitude.toFixed(4)}, ${longitude.toFixed(4)}`);
         } finally {
           setIsLocating(false);
@@ -76,19 +82,67 @@ export const SettingsView = ({ language, user }) => {
       },
       (error) => {
         console.error("Error getting location:", error);
-        alert("Unable to retrieve your location. Please check permissions.");
+        alert("Unable to retrieve location.");
         setIsLocating(false);
       }
     );
   };
 
-  const handleSave = () => {
+ // --- 2. SAVE TO DATABASE (FIXED) ---
+  const handleSave = async () => {
     setIsSaving(true);
-    setTimeout(() => {
-      setIsSaving(false);
-      setSaved(true);
-      setTimeout(() => setSaved(false), 2000);
-    }, 1000);
+    
+    try {
+        if (!user || !user._id) {
+            alert("Error: User ID not found. Please log in again.");
+            setIsSaving(false);
+            return;
+        }
+
+        const payload = {
+            userId: user._id, 
+            farmName,
+            cropTypes,
+            location,
+            avatar,
+            notifications
+        };
+
+        const response = await fetch(`${API_URL}/update-profile`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+
+        if (response.ok) {
+            // 1. Get the updated user data from the backend response
+            const updatedUserData = await response.json();
+            
+            console.log("✅ Database Updated:", updatedUserData);
+            
+            // 2. IMPORTANT: Update the browser's local storage immediately
+            // This ensures that when you refresh, the NEW data is loaded
+            localStorage.setItem('user', JSON.stringify(updatedUserData));
+            
+            // 3. Show Success Animation
+            setSaved(true);
+            
+            // 4. Reload the page after 1 second so the App sees the new data
+            setTimeout(() => {
+                setSaved(false);
+                window.location.reload(); 
+            }, 1000);
+            
+        } else {
+            alert("Failed to save changes. Server responded with error.");
+        }
+
+    } catch (error) {
+        console.error("Save Error:", error);
+        alert("Server Error. Is the backend running on Port 5000?");
+    } finally {
+        setIsSaving(false);
+    }
   };
 
   const toggleNotification = (key) => {
@@ -153,14 +207,14 @@ export const SettingsView = ({ language, user }) => {
                 transition={{ duration: 0.2 }}
                 className="space-y-8"
               >
-                {/* Avatar Section - Now Clickable */}
+                {/* Avatar Section */}
                 <div className="flex flex-col md:flex-row items-center md:items-start gap-6 pb-6 border-b border-slate-100">
                   <div className="relative group cursor-pointer" onClick={() => fileInputRef.current.click()}>
                     <div className="w-24 h-24 md:w-28 md:h-28 rounded-full bg-gradient-to-br from-emerald-100 to-teal-50 flex items-center justify-center text-emerald-700 text-3xl font-bold border-4 border-white shadow-lg shadow-emerald-100 overflow-hidden">
                       {avatar ? (
                         <img src={avatar} alt="Profile" className="w-full h-full object-cover" />
                       ) : (
-                        user.name.charAt(0)
+                        user?.name?.charAt(0) || "U"
                       )}
                     </div>
                     {/* Hidden Input */}
@@ -177,15 +231,15 @@ export const SettingsView = ({ language, user }) => {
                   </div>
                   
                   <div className="text-center md:text-left space-y-1 pt-2">
-                    <h3 className="text-2xl font-bold text-slate-800">{user.name}</h3>
-                    <p className="text-slate-500">{user.email || "farmer@agrisentry.com"}</p>
+                    <h3 className="text-2xl font-bold text-slate-800">{user?.name || "Farmer"}</h3>
+                    <p className="text-slate-500">{user?.email || "farmer@agrisentry.com"}</p>
                     <div className="flex items-center justify-center md:justify-start gap-2 pt-1">
-                       <span className="px-3 py-1 bg-lime-100 text-lime-700 text-xs font-bold rounded-full border border-lime-200">
-                         Pro Member
-                       </span>
-                       <span className="px-3 py-1 bg-slate-100 text-slate-600 text-xs font-bold rounded-full border border-slate-200 flex items-center gap-1">
-                         <Languages size={12} /> {language.toUpperCase()}
-                       </span>
+                        <span className="px-3 py-1 bg-lime-100 text-lime-700 text-xs font-bold rounded-full border border-lime-200">
+                          Pro Member
+                        </span>
+                        <span className="px-3 py-1 bg-slate-100 text-slate-600 text-xs font-bold rounded-full border border-slate-200 flex items-center gap-1">
+                          <Languages size={12} /> {language.toUpperCase()}
+                        </span>
                     </div>
                   </div>
                 </div>

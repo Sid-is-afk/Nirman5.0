@@ -131,7 +131,7 @@ export const translations = {
 
     // Landing Page
     landing: {
-      clickToInit: 'Click to Initialize',
+      clickToInit: 'Click here to begin',
       subtitle: 'The future of farming protection. Verified inputs, pest monitoring, and disease diagnosis in one shield.',
       agriChainTitle: 'Agri-Chain',
       agriChainDesc: 'Blockchain-verified supply inputs. Scan to verify authenticity instantly.',
@@ -166,20 +166,20 @@ export const translations = {
       diagnosisFlowSub: 'Heal your crops',
       dfStep1Title: 'Upload Specimen',
       dfStep1Desc: 'Navigate to "Field Doctor". Drag and drop a clear, close-up photo of the infected leaf into the upload zone.',
-      dfStep2Title: 'AI Analysis',
-      dfStep2Desc: 'Click "Diagnose". Our Gemini AI models analyze leaf texture, discoloration patterns, and fungal signatures.',
+      dfStep2Title: 'Hybrid yolo Analysis',
+      dfStep2Desc: 'YOLOv8 and Gemini AI combine to detect and analyze disease patterns instantly.',
       dfStep3Title: 'Treatment Plan',
       dfStep3Desc: 'Receive an instant diagnosis (e.g., Rust, Blight) with a confidence score and a recommended chemical or organic treatment plan.',
       
       // Community Flow
-      communityFlowTitle: 'Community Map',
-      communityFlowSub: 'Track local outbreaks',
+      communityFlowTitle: 'Pest Detection',
+      communityFlowSub: 'AI-powered identification from field images',
       cfStep1Title: 'View Local Threats',
-      cfStep1Desc: 'Open "Community Map". The GIS dashboard displays active red zones (pests) and yellow zones (diseases) reported by nearby farmers.',
+      cfStep1Desc: 'Monitor active red zones and pest outbreaks reported by nearby farmers.',
       cfStep2Title: 'Analyze Details',
-      cfStep2Desc: 'Click on any pin to view the "Full Details" modal. See attached photos, reporter reputation, and severity timelines.',
-      cfStep3Title: 'Report Issue',
-      cfStep3Desc: 'Spot a pest? Click "Report Issue", select the type, and verify your location to warn the community.',
+      cfStep2Desc: 'Advanced algorithms scan the image to identify pest species and infestation severity',
+      cfStep3Title: 'Details of Pest',
+      cfStep3Desc: 'View a detailed report including pest type, infestation severity, and recommended control measures.',
 
       footer: 'All rights reserved © Team Juggernaut 2025'
     }
@@ -351,20 +351,20 @@ export const translations = {
       diagnosisFlowSub: 'पौधों का निदान कैसे करें',
       dfStep1Title: 'नमूना अपलोड करें',
       dfStep1Desc: '"खेत चिकित्सक" पर जाएं। संक्रमित पत्ते की स्पष्ट, क्लोज़-अप तस्वीर अपलोड ज़ोन में खींचें और छोड़ें।',
-      dfStep2Title: 'एआई विश्लेषण',
-      dfStep2Desc: '"निदान" पर क्लिक करें। हमारे एआई मॉडल पत्ते की बनावट और कवक के संकेतों का विश्लेषण करते हैं।',
+      dfStep2Title: 'हाइब्रिड योलो एनालिसिस।',
+      dfStep2Desc: 'YOLOv8 और Gemini AI मिलकर बीमारी के पैटर्न का तुरंत पता लगाते हैं और उनका एनालिसिस करते हैं।',
       dfStep3Title: 'उपचार योजना',
       dfStep3Desc: 'आत्मविश्वास स्कोर और अनुशंसित रासायनिक या जैविक उपचार योजना के साथ तत्काल निदान (जैसे, रस्ट, ब्लाइट) प्राप्त करें।',
       
       // Community Flow
-      communityFlowTitle: 'सामुदायिक सुरक्षा',
+      communityFlowTitle: 'पेस्ट डिटेक्शन',
       communityFlowSub: 'प्रकोप को कैसे ट्रैक करें',
       cfStep1Title: 'स्थानीय खतरे देखें',
       cfStep1Desc: '"सामुदायिक मानचित्र" खोलें। डैशबोर्ड आस-पास के किसानों द्वारा रिपोर्ट किए गए सक्रिय लाल क्षेत्र (कीट) और पीले क्षेत्र (रोग) प्रदर्शित करता है।',
       cfStep2Title: 'विवरण का विश्लेषण करें',
-      cfStep2Desc: '"पूर्ण विवरण" मोडल देखने के लिए किसी भी पिन पर क्लिक करें। संलग्न फोटो, रिपोर्टर की प्रतिष्ठा और गंभीरता की समयरेखा देखें।',
-      cfStep3Title: 'समस्या की रिपोर्ट करें',
-      cfStep3Desc: 'कीट देखा? "समस्या की रिपोर्ट करें" पर क्लिक करें, प्रकार चुनें और समुदाय को चेतावनी देने के लिए अपना स्थान सत्यापित करें।',
+      cfStep2Desc: 'एडवांस्ड एल्गोरिदम इमेज को स्कैन करके कीड़ों की किस्मों और इन्फेक्शन की गंभीरता की पहचान करते हैं।',
+      cfStep3Title: 'कीट की जानकारी',
+      cfStep3Desc: 'कीट के प्रकार, इन्फेक्शन की गंभीरता और कंट्रोल के सुझाए गए तरीकों के साथ एक डिटेल्ड रिपोर्ट देखें।',
 
       footer: 'सर्वाधिकार सुरक्षित © टीम जगन्नाथ 2025'
     }
@@ -514,18 +514,18 @@ export const translations = {
       diagnosisFlowSub: 'ସମସ୍ୟାଗୁଡିକୁ ତୁରନ୍ତ ଚିହ୍ନଟ କରନ୍ତୁ',
       dfStep1Title: 'କ୍ୟାପଚର୍',
       dfStep1Desc: 'ପ୍ରଭାବିତ ଉଦ୍ଭିଦର ଫଟୋ ନିଅନ୍ତୁ',
-      dfStep2Title: 'ବିଶ୍ଳେଷଣ',
-      dfStep2Desc: 'AI ରୋଗ / କୀଟ ଚିହ୍ନଟ କରେ',
+      dfStep2Title: 'ହାଇବ୍ରିଡ୍ ୟୋଲୋ ବିଶ୍ଳେଷଣ।',
+      dfStep2Desc: 'YOLOv8 ଏବଂ Gemini AI ମିଳିତ ଭାବରେ ରୋଗର ଧାରାକୁ ତୁରନ୍ତ ଚିହ୍ନଟ ଏବଂ ବିଶ୍ଳେଷଣ କରନ୍ତି।',
       dfStep3Title: 'ଚିକିତ୍ସା',
       dfStep3Desc: 'ନିର୍ଦ୍ଦିଷ୍ଟ ଚିକିତ୍ସା ଯୋଜନା ପ୍ରାପ୍ତ କରନ୍ତୁ',
-      communityFlowTitle: 'କମ୍ୟୁନିଟି ଆଲର୍ଟ',
+      communityFlowTitle: 'କୀଟପତଙ୍ଗ ଚିହ୍ନଟ',
       communityFlowSub: 'ବିପଦରୁ ଆଗରେ ରୁହନ୍ତୁ',
       cfStep1Title: 'ନିରୀକ୍ଷଣ',
       cfStep1Desc: 'ସ୍ଥାନୀୟ ବିପଦ ମାନଚିତ୍ର ଦେଖନ୍ତୁ',
       cfStep2Title: 'ରିପୋର୍ଟ',
-      cfStep2Desc: 'ପର୍ଯ୍ୟବେକ୍ଷଣଗୁଡିକ ସୁରକ୍ଷିତ ଭାବରେ ସେୟାର କରନ୍ତୁ',
-      cfStep3Title: 'ସୁରକ୍ଷା',
-      cfStep3Desc: 'ପୂର୍ବ-ଖାଲି ଫସଲ ସୁରକ୍ଷା',
+      cfStep2Desc: 'ଉନ୍ନତ ଆଲଗୋରିଦମ କୀଟପତଙ୍ଗ ପ୍ରଜାତି ଏବଂ ଆକ୍ରମଣର ଗମ୍ଭୀରତା ଚିହ୍ନଟ କରିବା ପାଇଁ ପ୍ରତିଛବିକୁ ସ୍କାନ କରନ୍ତି।',
+      cfStep3Title: 'କୀଟପତଙ୍ଗର ବିବରଣୀ',
+      cfStep3Desc: 'କୀଟପତଙ୍ଗର ପ୍ରକାର, ଆକ୍ରମଣର ତୀବ୍ରତା ଏବଂ ସୁପାରିଶ କରାଯାଇଥିବା ନିୟନ୍ତ୍ରଣ ପଦକ୍ଷେପ ସହିତ ଏକ ବିସ୍ତୃତ ରିପୋର୍ଟ ଦେଖନ୍ତୁ।',
       footer: 'ଏଗ୍ରି-ସେଣ୍ଟ୍ରି ସିଷ୍ଟମ୍ v3.0 • ସୁରକ୍ଷିତ କୃଷି ଗୁପ୍ତଚର'
     }
   }
